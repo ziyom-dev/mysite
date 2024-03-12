@@ -20,7 +20,7 @@ env/
 tests/
 
 # Статические файлы
-static/
+/static/
 
 # Медиафайлы
 media/
