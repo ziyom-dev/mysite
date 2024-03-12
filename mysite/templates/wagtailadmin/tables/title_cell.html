@@ -1,0 +1,36 @@
+{% load wagtailadmin_tags %}
+{% load wagtailimages_tags %}
+
+
+<td class="{% if column.classname %}{{ column.classname }} {% endif %}title">
+    <div class="title-wrapper">
+        {% fragment as title %}
+            {% if title_id %}
+                {% if value.file.url %}
+                    {% image value width-200 %}
+                {% else %}
+                    <span id="{{ title_id }}">{{ value }}</span>
+                {% endif %}
+            {% else %}
+                {{ value }}
+            {% endif %}
+        {% endfragment %}
+        {% block title %}
+            {% if link_url %}
+                <a {% include "wagtailadmin/shared/attrs.html" with attrs=link_attrs %}>{{ title }}</a>
+            {% elif label_id %}
+                <label for="{{ label_id }}">{{ title }}</label>
+            {% else %}
+                {{ title }}
+            {% endif %}
+            
+        {% endblock %}
+    </div>
+    {% if buttons %}
+        <ul class="actions">
+            {% block buttons %}
+                {% include "wagtailadmin/shared/buttons.html" %}
+            {% endblock %}
+        </ul>
+    {% endif %}
+</td>
