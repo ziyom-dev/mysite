@@ -37,4 +37,5 @@ local_settings.py
 
 # Прочее
 Thumbs.db
+db.sqlite3
 .DS_Store
