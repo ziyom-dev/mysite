@@ -9,6 +9,7 @@ from wagtail.documents import urls as wagtaildocs_urls
 from ecommerce.api.urls import router as ecommerce_router
 from ecommerce.api.views import (
     CurrentUserView,
+    ProductReviewsView,
 )
 from ecommerce.api.otp_views import (
     OTPStorageView,
@@ -33,10 +34,13 @@ urlpatterns = [
     path('api/', include(ecommerce_router.urls)),
     path('api/auth/', include('rest_framework.urls')),
     
-    # uer
+    # user
     path('api/user/', CurrentUserView.as_view(), name='current-user'),
     path('api/user/auth/', AuthView.as_view(), name='user-auth'),
     path('api/otp-storage/', OTPStorageView.as_view(), name='otp_storage'),
+    
+    # Product
+    path('api/products/<slug:product_slug>/reviews/', ProductReviewsView.as_view(), name='product-reviews'),
 
     # token
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),

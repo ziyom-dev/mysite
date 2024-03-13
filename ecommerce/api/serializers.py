@@ -2,25 +2,8 @@ from ..models import *
 from rest_framework import serializers
 from rest_framework.fields import Field
 from Customer.models import User
+from django.db.models import Avg
 
-
-class AttributeValueSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = AttributeValue
-        fields = ["id", "value"]
-
-class AttributeSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Attribute
-        fields = "__all__"
-
-class ProductAttributeSerializer(serializers.ModelSerializer):
-    attribute = AttributeSerializer()
-    attribute_value = AttributeValueSerializer()
-    
-    class Meta:
-        model = ProductAttribute
-        fields = ["attribute", "attribute_value", "sort_order"]
 
 class ImageSerializedField(Field):
     """A custom serializer used in Wagtail's API, now excluding SVG images for WebP conversion."""
@@ -51,16 +34,18 @@ class ImageSerializedField(Field):
         rendition = image.get_rendition(rendition_filter + "|format-webp")
         return rendition.url
     
-
-
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'username', 'phone_number', 'first_name', 'last_name', 'email']
 
+class CreateReviewSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Reviews
+        fields = ['stars', 'review_text']
+
 class ReviewsSerializer(serializers.ModelSerializer):
     user = UserSerializer()
-
 
     class Meta:
         model = Reviews
@@ -104,17 +89,21 @@ class ProductSerializer(serializers.ModelSerializer):
     gallery = ProductImageSerializer(many=True, source='product_images')
     category = CategorySerializer()
     brand = BrandSerializer()
-    prices_in_currencies = serializers.SerializerMethodField()
-    product_attrs = ProductAttributeSerializer(many=True)
-    product_reviews = ReviewsSerializer(many=True)
+    review_count = serializers.SerializerMethodField()
+    product_rate = serializers.SerializerMethodField()
+    
+    def get_review_count(self, obj):
+        # Возвращаем количество видимых отзывов для продукта
+        return obj.product_reviews.filter(is_visible=True).count()
+    
+    def get_product_rate(self, obj):
+        reviews = obj.product_reviews.filter(is_visible=True)
+        if reviews.exists():
+            average = reviews.aggregate(models.Avg('stars'))['stars__avg']
+            # Округляем средний рейтинг до ближайшего целого числа
+            return round(average)
+        return 5  # Возвращаем 5, если отзывов нет
 
-    
-    def get_prices_in_currencies(self, obj):
-        return obj.get_prices_in_all_currencies()
-    
-    def get_product_reviews(self, obj):
-        reviews = Reviews.objects.filter(product=obj, is_visible=True)
-        return ReviewSerializer(reviews, many=True, context=self.context).data
     
     def to_representation(self, instance):
         representation = super(ProductSerializer, self).to_representation(instance)

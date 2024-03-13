@@ -9,3 +9,4 @@ router.register(r'brands', BrandViewSet)
 router.register(r'currency', CurrencyViewSet)
 router.register(r'user/favorites', FavoriteProductsViewSet, basename='user-favorites')
 router.register(r'user/orders', OrderViewSet, basename='user-orders')
+

@@ -1,12 +1,12 @@
 # views.py
 
-from .serializers import UserSerializer, BrandSerializer, CategorySerializer, ProductSerializer, FavoriteSerializer, OrderSerializer, CurrencySerializer
+from .serializers import UserSerializer, BrandSerializer, CategorySerializer, ProductSerializer, FavoriteSerializer, OrderSerializer, CurrencySerializer, ReviewsSerializer, CreateReviewSerializer
 from ..models import *
 from .pagination import *
 from .filters import *
 
-from rest_framework import viewsets, status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework import viewsets, status, views
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.generics import RetrieveUpdateAPIView
 from django.db.models import Q, F
 
@@ -44,6 +44,34 @@ class CurrencyViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = CurrencySerializer
     search_fields = ['code']
     lookup_field = 'code'
+    
+class ProductReviewsView(views.APIView):
+    # Установим разрешение AllowAny как базовое, чтобы все могли видеть отзывы
+    permission_classes = [AllowAny]
+
+    def get_permissions(self):
+        """
+        Инстанцируем и возвращаем список разрешений, которые этот представление требует.
+        """
+        if self.request.method == 'POST':
+            self.permission_classes = [IsAuthenticated]
+        return super(ProductReviewsView, self).get_permissions()
+
+    def get(self, request, product_slug):
+        product = get_object_or_404(Product, slug=product_slug)
+        reviews = Reviews.objects.filter(product=product)
+        serializer = ReviewsSerializer(reviews, many=True)
+        return Response(serializer.data)
+
+    def post(self, request, product_slug):
+        product = get_object_or_404(Product, slug=product_slug)
+        serializer = CreateReviewSerializer(data=request.data)
+        if serializer.is_valid():
+            # Сохраняем отзыв, передавая user как дополнительный аргумент в save()
+            serializer.save(user=request.user, product=product)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 class CategoryViewSet(ShopBaseViewSet):
     queryset = Category.objects.all()
@@ -73,14 +101,14 @@ class ProductViewSet(ShopBaseViewSet):
     lookup_field = 'slug'
 
         # Применяем декораторы кеширования к методу list
-    @method_decorator(cache_page(60*60))  # Кеширует на 2 минуты
-    @method_decorator(vary_on_headers("Authorization", "Accept-Language"))
+    # @method_decorator(cache_page(60*60))  # Кеширует на 2 минуты
+    # @method_decorator(vary_on_headers("Authorization", "Accept-Language"))
     def list(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
 
     # Применяем декораторы кеширования к методу retrieve
-    @method_decorator(cache_page(60*60))  # Кеширует на 5 минут
-    @method_decorator(vary_on_headers("Authorization", "Accept-Language"))
+    # @method_decorator(cache_page(60*60))  # Кеширует на 5 минут
+    # @method_decorator(vary_on_headers("Authorization", "Accept-Language"))
     def retrieve(self, request, *args, **kwargs):
         response = super().retrieve(request, *args, **kwargs)
         # Получаем объект продукта из базы данных
@@ -95,20 +123,6 @@ class ProductViewSet(ShopBaseViewSet):
         brand_slug = self.request.query_params.get('brand_slug', None)
         if brand_slug is not None:
             queryset = queryset.filter(brand__slug=brand_slug)
-            
-        attribute_value_ids = self.request.query_params.get('attr', None)
-
-        # Применяем фильтрацию только если есть запрос по attribute_value
-        if attribute_value_ids:
-            # Разделяем значения по запятой и преобразуем их в список целых чисел
-            attribute_value_ids = [int(attr_id) for attr_id in attribute_value_ids.split(',')]
-
-            # Используем Q-объект для создания условия "или" для нескольких значений
-            q_objects = Q()
-            for attr_id in attribute_value_ids:
-                q_objects |= Q(product_attrs__attribute_value__id=attr_id)
-
-            queryset = queryset.filter(q_objects)
         
         price_from = self.request.query_params.get('price_from', None)
         price_to = self.request.query_params.get('price_to', None)
