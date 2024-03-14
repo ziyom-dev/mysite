@@ -1,7 +1,7 @@
 from .base import *
 
 DEBUG = False
-
+ALLOWED_HOSTS = ['.itpapa.uz', 'localhost']
 CACHES = {
     'default': {
         'BACKEND': 'django_redis.cache.RedisCache',
