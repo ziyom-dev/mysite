@@ -155,3 +155,17 @@ def register_attribute_group_chooser_viewset():
     return attribute_group_chooser_viewset
 
 
+@hooks.register('construct_snippet_action_menu')
+def make_publish_default_action_for_snippets(menu_items, request, context):
+    for (index, item) in enumerate(menu_items):
+        if item.name == 'action-publish':
+            # Вынимаем элемент из списка
+            menu_items.pop(index)
+            # Вставляем его в начало списка, делая основным
+            menu_items.insert(0, item)
+            break
+from django.utils.html import format_html
+
+@hooks.register('insert_global_admin_js', order=100)
+def global_admin_js():
+    return format_html('<script src="{}"></script>', '/static/js/mysite.js')

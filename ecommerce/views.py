@@ -39,8 +39,7 @@ class UserSearchFilterMixin(forms.Form):
             self.is_searching = True
             self.search_query = search_query
         return objects
-    
-    
+
 class BaseUserChooseView(BaseChooseView):
 
     @property
@@ -103,6 +102,8 @@ class UserChooserViewSet(ChooserViewSet):
 user_chooser_viewset = UserChooserViewSet("user_chooser")
 
 
+
+# Attribute GroupChooser
 class AttributeGroupSearchFilterMixin(forms.Form):
     q = forms.CharField(
         label=_("Search term"),
@@ -140,6 +141,9 @@ class AttributeGroupChooseResultsView(ChooseResultsViewMixin, CreationFormMixin,
 
 class AttributeGroupChooserViewSet(ChooserViewSet):
     model = "ecommerce.AttributeGroup"
+    
+    form_fields = ["name"]
+    
     choose_one_text = _("Choose a group")
     choose_another_text = _("Choose another group")
     edit_item_text = _("Edit this group")
@@ -152,7 +156,7 @@ attribute_group_chooser_viewset = AttributeGroupChooserViewSet('attribute_group_
 
 
 
-
+# Attribute Value Chooser
 class AttributeValueSearchFilterMixin(forms.Form):
     q = forms.CharField(
         label=_("Search term"),
@@ -203,6 +207,8 @@ class AttributeValueChooserViewSet(ChooserViewSet):
 
 attribute_value_chooser_viewset = AttributeValueChooserViewSet('attribute_value_chooser')
 
+
+# Attribute Chooser
 class AttributeSearchFilterMixin(forms.Form):
     q = forms.CharField(
         label=_("Search term"),
@@ -238,16 +244,14 @@ class AttributeChooseView(ChooseViewMixin, CreationFormMixin, BaseAttributeChoos
 class AttributeChooseResultsView(ChooseResultsViewMixin, CreationFormMixin, BaseAttributeChooseView):
     pass
 
-
 class AttributeChooserViewSet(ChooserViewSet):
     model = "ecommerce.Attribute"
-    form_fields = ["group"]
+    form_fields = ["group", "name"]
     url_filter_parameters = ["group"]
     preserve_url_parameters = ["multiple", "group"]
     
     choose_view_class = AttributeChooseView
     choose_results_view_class = AttributeChooseResultsView
-    
     
     choose_one_text = _("Choose an attribute")
     choose_another_text = _("Choose another attribute")

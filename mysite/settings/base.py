@@ -176,6 +176,7 @@ WAGTAILIMAGES_EXTENSIONS = ["gif", "jpg", "jpeg", "png", "webp", "svg"]
 # Base URL to use when referring to full URLs within the Wagtail admin backend -
 # e.g. in notification emails. Don't include '/admin' or a trailing slash
 WAGTAILADMIN_BASE_URL = "http://example.com"
+FRONTEND_URL = 'https://itpapa.uz/'
 
 AUTH_USER_MODEL = 'Customer.User'
 

@@ -4,6 +4,46 @@ from rest_framework.fields import Field
 from Customer.models import User
 from django.db.models import Avg
 
+class AttributeValueSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AttributeValue
+        fields = ['id', 'value']
+        
+class AttributeSerializer(serializers.ModelSerializer):
+    values = AttributeValueSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Attribute
+        fields = ['id', 'name', 'values']
+
+class AttributeGroupSerializer(serializers.ModelSerializer):
+    attributes = AttributeSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = AttributeGroup
+        fields = ['id', 'name', 'attributes']
+        
+class ProductAttributeAttrsSerializer(serializers.ModelSerializer):
+    attribute_name = serializers.CharField(source='attribute.name', read_only=True)
+    attribute_value_name = serializers.CharField(source='attribute_value.value', read_only=True)
+    attribute_id = serializers.ReadOnlyField(source='attribute.id')
+    attribute_value_id = serializers.ReadOnlyField(source='attribute_value.id')
+
+    class Meta:
+        model = ProductAttributeAttrs
+        fields = ['attribute_id', 'attribute_name', 'attribute_value_id', 'attribute_value_name']
+        
+class ProductAttributeSerializer(serializers.ModelSerializer):
+    attrs = ProductAttributeAttrsSerializer(many=True, read_only=True)
+    attribute_group_name = serializers.CharField(source='attribute_group.name', read_only=True)
+    attribute_group_id = serializers.ReadOnlyField(source='attribute_group.id')
+
+    class Meta:
+        model = ProductAttribute
+        fields = ['attribute_group_id', 'attribute_group_name', 'attrs']
+
+
+
 
 class ImageSerializedField(Field):
     """A custom serializer used in Wagtail's API, now excluding SVG images for WebP conversion."""
@@ -89,6 +129,7 @@ class ProductSerializer(serializers.ModelSerializer):
     gallery = ProductImageSerializer(many=True, source='product_images')
     category = CategorySerializer()
     brand = BrandSerializer()
+    product_attrs = ProductAttributeSerializer(many=True, read_only=True)
     review_count = serializers.SerializerMethodField()
     product_rate = serializers.SerializerMethodField()
     

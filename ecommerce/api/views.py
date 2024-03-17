@@ -120,6 +120,15 @@ class ProductViewSet(ShopBaseViewSet):
 
     def get_queryset(self):
         queryset = Product.objects.filter(live=True)
+        
+        attr_values = self.request.query_params.get('attr', None)
+
+        if attr_values:
+            attr_values_list = attr_values.split(',')
+            # Создаем Q-объекты для фильтрации продуктов по атрибутам
+            attrs_query = Q(product_attrs__attrs__attribute_value__id__in=attr_values_list)
+            queryset = queryset.filter(attrs_query).distinct()
+        
         brand_slug = self.request.query_params.get('brand_slug', None)
         if brand_slug is not None:
             queryset = queryset.filter(brand__slug=brand_slug)

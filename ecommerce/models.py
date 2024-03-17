@@ -13,7 +13,6 @@ from django.db import transaction
 from Customer.models import User
 from .widgets import UserChooserWidget, AttributeValueChooserWidget, AttributeChooserWidget, AttributeGroupChooserWidget
 from wagtail.search import index
-
         
 class Category(models.Model):
     name = models.CharField(max_length=100)
@@ -239,10 +238,6 @@ class ProductAttributeAttrs(Orderable):
                 FieldPanel('attribute_value', widget=AttributeValueChooserWidget(linked_fields={
                     'attribute': {'match': r'^id_product_attrs-\d+-attrs-\d+-', 'append': 'attribute'}
                 }))
-                
-                # id_product_attrs-1-attrs-0-attribute
-                
-             
             ]
         )
     ]
