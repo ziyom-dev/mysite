@@ -101,6 +101,25 @@ class BrandSerializer(serializers.ModelSerializer):
             'url': {'lookup_field': 'slug'}
         }
         
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        request = self.context.get('request')
+        
+        # Проверяем, обращение идет к конкретному экземпляру, а не к списку
+        if request and request.parser_context.get('kwargs').get('slug'):
+            # Агрегируем категории продуктов, которые принадлежат данному бренду
+            # Предполагается, что у вас есть обратная связь от Product к Brand через поле brand
+            # и от Product к Category через поле category
+            categories = Category.objects.filter(
+                product__brand=instance
+            ).distinct()  # Используем distinct(), чтобы избежать дубликатов
+
+            # Сериализуем категории
+            categories_serializer = CategorySerializer(categories, many=True)
+            representation['categories'] = categories_serializer.data
+
+        return representation
+        
 class ParentCategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Category 

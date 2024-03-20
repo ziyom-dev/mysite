@@ -8,7 +8,7 @@ from .filters import *
 from rest_framework import viewsets, status, views
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.generics import RetrieveUpdateAPIView
-from django.db.models import Q, F
+from django.db.models import Case, When, Q, F, FloatField
 
 
 from django_filters.rest_framework import DjangoFilterBackend
@@ -119,13 +119,18 @@ class ProductViewSet(ShopBaseViewSet):
         return response
 
     def get_queryset(self):
-        queryset = Product.objects.filter(live=True)
+        queryset = Product.objects.filter(live=True).annotate(
+            actual_price=Case(
+                When(sale_price__isnull=False, then=F('sale_price')),
+                default=F('price'),
+                output_field=FloatField()
+            )
+        )
         
         attr_values = self.request.query_params.get('attr', None)
-
+        
         if attr_values:
             attr_values_list = attr_values.split(',')
-            # Создаем Q-объекты для фильтрации продуктов по атрибутам
             attrs_query = Q(product_attrs__attrs__attribute_value__id__in=attr_values_list)
             queryset = queryset.filter(attrs_query).distinct()
         
@@ -137,10 +142,10 @@ class ProductViewSet(ShopBaseViewSet):
         price_to = self.request.query_params.get('price_to', None)
 
         if price_from is not None:
-            queryset = queryset.filter(price__gte=float(price_from))
+            queryset = queryset.filter(actual_price__gte=float(price_from))
 
         if price_to is not None:
-            queryset = queryset.filter(price__lte=float(price_to))
+            queryset = queryset.filter(actual_price__lte=float(price_to))
             
         return queryset
     

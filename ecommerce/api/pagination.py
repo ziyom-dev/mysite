@@ -90,10 +90,40 @@ class ProductsPagination(LimitOffsetPagination):
     def get_filters(self):
         attributes = self.get_attributes_from_queryset()
         brands = self.get_brands_from_queryset()
+        min_price, max_price = self.get_price_range_from_queryset()
         return {
             'brands': brands,  # Пример данных для "brands"
-            'attributes': attributes  # Пример данных для "attributes"
+            'attributes': attributes,  # Пример данных для "attributes"
+            'price': {
+                'min': min_price,
+                'max': max_price,
+            },
         }
+    
+    def get_price_range_from_queryset(self):
+        # Предполагаем, что изначально минимальная и максимальная цены не установлены
+        min_price = None
+        max_price = None
+
+        for product in self.queryset:
+            # Преобразуем цену и цену со скидкой из строки в число, обрабатывая случай, когда скидка отсутствует
+            product_price = float(product.price)
+            product_sale_price = float(product.sale_price) if product.sale_price else product_price
+
+            # Определяем актуальную цену как минимум из цены и цены со скидкой
+            actual_price = min(product_price, product_sale_price)
+
+            # Обновляем минимальную и максимальную цены
+            if min_price is None or actual_price < min_price:
+                min_price = actual_price
+            if max_price is None or actual_price > max_price:
+                max_price = actual_price
+
+        # Если после обхода всех продуктов цены не были установлены (queryset был пустым), устанавливаем их в 0
+        if min_price is None or max_price is None:
+            min_price, max_price = 0, 0
+
+        return min_price, max_price
         
     def get_brands_from_queryset(self):
         # Используем set для хранения уникальных брендов
@@ -106,18 +136,14 @@ class ProductsPagination(LimitOffsetPagination):
         # Преобразуем set в список словарей
         brands_list = [{'brand_id': brand[0], 'brand_name': brand[1]} for brand in brands_set]
 
-        return brands_list
-        
+        return brands_list      
         
     def get_attributes_from_queryset(self):
         attribute_groups_dict = {}
-        attribute_usage_count = {}
 
         for product in self.queryset.prefetch_related(
             "product_attrs__attrs__attribute__group", "product_attrs__attrs__attribute_value"
         ):
-            product_attributes_set = set()  # Для отслеживания уникальных атрибутов в текущем продукте
-
             for product_attr in product.product_attrs.all():
                 group_id = product_attr.attribute_group.id
                 group_name = product_attr.attribute_group.name
@@ -126,47 +152,41 @@ class ProductsPagination(LimitOffsetPagination):
                     attribute_groups_dict[group_id] = {
                         "attribute_group_id": group_id,
                         "attribute_group_name": group_name,
-                        "attrs": set()
+                        "attrs": {}
                     }
 
                 for attr in product_attr.attrs.all():
-                    attr_tuple = (
-                        attr.attribute.id,
-                        attr.attribute.name,
-                        attr.attribute_value.id,
-                        attr.attribute_value.value
-                    )
+                    attribute_id = attr.attribute.id
+                    attribute_name = attr.attribute.name
 
-                    # Проверяем, встречался ли уже атрибут в текущем продукте
-                    if attr_tuple not in product_attributes_set:
-                        product_attributes_set.add(attr_tuple)
-                        attribute_groups_dict[group_id]["attrs"].add(attr_tuple)
+                    if attribute_id not in attribute_groups_dict[group_id]["attrs"]:
+                        attribute_groups_dict[group_id]["attrs"][attribute_id] = {
+                            "attribute_id": attribute_id,
+                            "attribute_name": attribute_name,
+                            "values": []
+                        }
 
-                        # Увеличиваем счетчик использования атрибута
-                        if attr_tuple in attribute_usage_count:
-                            attribute_usage_count[attr_tuple] += 1
-                        else:
-                            attribute_usage_count[attr_tuple] = 1
+                    value_dict = {
+                        "attribute_value_id": attr.attribute_value.id,
+                        "attribute_value_name": attr.attribute_value.value,
+                        "product_count": 1  # Предположим, что каждый продукт уникален для упрощения
+                    }
 
-        # Преобразуем set в список, добавляем счетчик и сортируем
+                    # Проверка на уникальность значения атрибута для предотвращения дубликатов
+                    if value_dict not in attribute_groups_dict[group_id]["attrs"][attribute_id]["values"]:
+                        attribute_groups_dict[group_id]["attrs"][attribute_id]["values"].append(value_dict)
+
+        # Преобразование структуры данных для соответствия желаемому формату вывода
+        final_result = []
         for group_id, group_data in attribute_groups_dict.items():
-            attrs_sorted_list = sorted(list(group_data["attrs"]), key=lambda x: x[0])  # Сортировка по ID атрибута
-            attrs_list = [
-                {
-                    "attribute_id": attr[0],
-                    "attribute_name": attr[1],
-                    "attribute_value_id": attr[2],
-                    "attribute_value_name": attr[3],
-                    "product_count": attribute_usage_count[attr]  # Добавляем счетчик продуктов
-                }
-                for attr in attrs_sorted_list
-            ]
+            attrs_list = []
+            for attr_id, attr_data in group_data["attrs"].items():
+                attrs_list.append(attr_data)
+            
             group_data["attrs"] = attrs_list
+            final_result.append(group_data)
 
-        return list(attribute_groups_dict.values())
-
-
-
+        return final_result
     
 class CategoriesPagination(CustomPagination):
     default_limit = 100

@@ -39,3 +39,7 @@ local_settings.py
 Thumbs.db
 db.sqlite3
 .DS_Store
+
+
+migrations/*.py
+!migrations/__init__.py
