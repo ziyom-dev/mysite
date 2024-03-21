@@ -1,7 +1,8 @@
 # views.py
 
-from .serializers import UserSerializer, BrandSerializer, CategorySerializer, ProductSerializer, FavoriteSerializer, OrderSerializer, CurrencySerializer, ReviewsSerializer, CreateReviewSerializer
+from .serializers import UserSerializer, BrandSerializer, CategorySerializer, ProductSerializer, FavoriteSerializer, OrderSerializer, CurrencySerializer, ReviewsSerializer, CreateReviewSerializer, AddressSerializer
 from ..models import *
+from Customer.models import Address
 from .pagination import *
 from .filters import *
 
@@ -209,3 +210,27 @@ class OrderViewSet(viewsets.ModelViewSet):
             order.save()
 
         return Response(self.get_serializer(order).data, status=status.HTTP_201_CREATED)
+    
+    
+class AddressViewSet(viewsets.ModelViewSet):
+    serializer_class = AddressSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        # Фильтруем список, чтобы показать только адреса текущего пользователя
+        return Address.objects.filter(user=self.request.user)
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(user=request.user)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def destroy(self, request, *args, **kwargs):
+        address_id = kwargs.get('pk')
+        address = get_object_or_404(Address, id=address_id, user=request.user)
+        
+        address.delete()
+        return Response({'message': 'Адрес удален'}, status=status.HTTP_204_NO_CONTENT)

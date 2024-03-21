@@ -1,7 +1,8 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser, Group, Permission
 from phonenumber_field.modelfields import PhoneNumberField
-from wagtail.models import ClusterableModel
+from wagtail.models import ClusterableModel, Orderable
+from modelcluster.models import ParentalKey
 from wagtail.admin.panels import TabbedInterface, FieldRowPanel, ObjectList, FieldPanel, InlinePanel
 from django.utils.translation import gettext_lazy as _
 
@@ -12,6 +13,9 @@ class User(AbstractUser, ClusterableModel):
     
     favorites_panels = [
         InlinePanel('favorite_products', heading="Favorite Products", label="Favorite Product"),
+    ]
+    address_panels = [
+        InlinePanel('user_adress', heading="Адреса доставки", label="Адрес"),
     ]
     
     main_panels = [
@@ -24,6 +28,7 @@ class User(AbstractUser, ClusterableModel):
         [
             ObjectList(main_panels, heading='Главные'),
             ObjectList(favorites_panels, heading='Избранные товары'),
+            ObjectList(address_panels, heading='Адреса'),
         ]
     )
     
@@ -53,3 +58,32 @@ class User(AbstractUser, ClusterableModel):
             return f"{self.phone_number} ({self.first_name} {self.last_name})"
         else:
             return str(self.phone_number)
+        
+class Address(Orderable):
+    user = ParentalKey(User, on_delete=models.CASCADE, related_name='user_adress')
+    
+    title = models.CharField(max_length=225)
+    link = models.URLField(blank=True, null=True)
+    name = models.CharField(max_length=225, blank=True, null=True)
+    entrance = models.IntegerField(blank=True, null=True)
+    floor = models.IntegerField(blank=True, null=True)
+    apartment = models.IntegerField(blank=True, null=True)
+    landmark = models.CharField(max_length=225, blank=True, null=True)
+
+    panels = [
+        FieldPanel('title'),
+        FieldPanel('link'),
+        FieldRowPanel(
+            [
+                FieldPanel('name'),
+                FieldPanel('landmark'),
+            ]
+        ),
+        FieldRowPanel(
+            [
+                FieldPanel('entrance'),
+                FieldPanel('floor'),
+                FieldPanel('apartment'),
+            ]
+        )
+    ]

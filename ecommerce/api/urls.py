@@ -1,5 +1,5 @@
 from rest_framework import routers
-from .views import CategoryViewSet, ProductViewSet, BrandViewSet, FavoriteProductsViewSet, OrderViewSet,CurrencyViewSet
+from .views import CategoryViewSet, ProductViewSet, BrandViewSet, FavoriteProductsViewSet, OrderViewSet,CurrencyViewSet, AddressViewSet
 
 router = routers.DefaultRouter()
 
@@ -9,4 +9,5 @@ router.register(r'brands', BrandViewSet)
 router.register(r'currency', CurrencyViewSet)
 router.register(r'user/favorites', FavoriteProductsViewSet, basename='user-favorites')
 router.register(r'user/orders', OrderViewSet, basename='user-orders')
+router.register(r'user/address', AddressViewSet, basename='user-address')
 

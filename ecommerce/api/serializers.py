@@ -1,7 +1,7 @@
 from ..models import *
 from rest_framework import serializers
 from rest_framework.fields import Field
-from Customer.models import User
+from Customer.models import User, Address
 from django.db.models import Avg
 
 class AttributeValueSerializer(serializers.ModelSerializer):
@@ -190,6 +190,8 @@ class FavoriteSerializer(serializers.ModelSerializer):
         model = UserFavoriteProduct
         fields = ['id', 'sort_order', 'user', 'product',]
         
+
+        
 class OrderItemSerializer(serializers.ModelSerializer):
     product = ProductSerializer()
     class Meta:
@@ -207,3 +209,9 @@ class CurrencySerializer(serializers.ModelSerializer):
     class Meta:
         model = Currency
         fields = "__all__"
+        
+class AddressSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Address
+        exclude = ['user']
