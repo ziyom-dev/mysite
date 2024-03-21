@@ -4,7 +4,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from Customer.models import User
-from .otp_service import send_otp, verify_otp, otp_storage, send_otp_attempts
+from .otp_service import send_otp, verify_otp, otp_storage
 from rest_framework_simplejwt.tokens import RefreshToken
 from phonenumber_field.validators import validate_international_phonenumber
 from django.core.exceptions import ValidationError
@@ -14,7 +14,7 @@ from django.core.exceptions import ValidationError
 class OTPStorageView(APIView):
     def get(self, request):
         # Возвращаем содержимое otp_storage
-        return Response([otp_storage,send_otp_attempts])
+        return Response([otp_storage])
 
 class AuthView(APIView):
     def post(self, request):

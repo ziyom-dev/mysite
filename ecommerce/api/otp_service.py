@@ -2,11 +2,14 @@
 
 import random
 import time
+import requests
 
 # Словарь для хранения OTP в памяти
 otp_storage = {}
-send_otp_attempts = {}
-verify_otp_attempts = {}
+
+
+TELEGRAM_TOKEN = '7056099882:AAEKKwskPJk5NZ4pcQ2a20Xh2fYZKc0YSP0'
+TELEGRAM_API_URL = f'https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage'
 
 
 def generate_otp(length=6):
@@ -14,6 +17,22 @@ def generate_otp(length=6):
     numbers = '0123456789'
     otp = ''.join(random.choice(numbers) for i in range(length))
     return otp
+
+def send_otp_via_telegram(chat_id, message):
+    """
+    Отправляет сообщение через Telegram бота.
+    
+    :param chat_id: ID чата в Telegram, куда будет отправлено сообщение.
+    :param message: Текст сообщения для отправки.
+    """
+    data = {'chat_id': chat_id, 'text': message}
+    try:
+        response = requests.post(TELEGRAM_API_URL, data=data)
+        response.raise_for_status()
+        return True
+    except requests.exceptions.RequestException as e:
+        print(f"Ошибка при отправке сообщения через Telegram: {e}")
+        return False
 
 def send_otp(phone_number, timeout=60, attempts=1):
     current_time = time.time()
@@ -31,6 +50,16 @@ def send_otp(phone_number, timeout=60, attempts=1):
     """Генерирует и отправляет OTP, выводя его в консоль."""
     otp = generate_otp()
     otp_storage[phone_number]["otp"] = otp  # Сохранение OTP в словаре
+    
+    chat_id = "-4157512195"
+    otp_message = f"{phone_number}: {otp}"
+    
+    telegram_sent_successfully = send_otp_via_telegram(chat_id, otp_message)
+    if not telegram_sent_successfully:
+        print("Не удалось отправить OTP через Telegram.")
+    else:
+        print(f"OTP для {phone_number} успешно отправлен через Telegram.")
+    
     print(f"OTP for {phone_number}: {otp}")  # Вывод в консоль
     return {"success": True, "otp": otp}
 
