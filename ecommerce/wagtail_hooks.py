@@ -4,14 +4,21 @@ from django.urls import re_path
 from wagtail.snippets.models import register_snippet
 from wagtail.snippets.views.snippets import SnippetViewSet, SnippetViewSetGroup
 from .models import Category, Product, Brand, Order, Currency, Reviews
-from .models import AttributeGroup, Attribute, AttributeValue, ProductAttribute, ProductAttributeAttrs
+from .models import AttributeGroup, Attribute, AttributeValue, ProductAttribute, ProductAttributeAttrs, Otp
 from Customer.models import User
+
+class OtpSnippetViewSet(SnippetViewSet):
+    model = Otp
+    inspect_view_enabled = True
+    base_url_path = "otp"
+    
+register_snippet(OtpSnippetViewSet)
 
 
     
 class CurrencySnippetViewSet(SnippetViewSet):
     model = Currency
-    icon = "list-ul"
+    icon = "dollar-sign"
     inspect_view_enabled = True
     base_url_path = "ecommerce/currency"
     
@@ -24,8 +31,7 @@ class ReviewsSnippetViewSet(SnippetViewSet):
 
 class CustomerSnippetViewSet(SnippetViewSet):
     model = User
-    label = "Customers"
-    icon = "list-ul"
+    icon = "group"
     inspect_view_enabled = True
     base_url_path = "ecommerce/customers"
     
@@ -39,8 +45,7 @@ class CustomerSnippetViewSet(SnippetViewSet):
     
 class OrderSnippetViewSet(SnippetViewSet):
     model = Order
-    label = "Orders"
-    icon = "placeholder"
+    icon = "orders"
     inspect_view_enabled = True
     base_url_path = "ecommerce/orders"
     list_filter = ('status',)
@@ -49,7 +54,7 @@ class OrderSnippetViewSet(SnippetViewSet):
 class EcommerceGroup(SnippetViewSetGroup):
     menu_label = "Ecommerce"
     base_url_path = "ecommerce"
-    menu_icon = "folder"  # change as required
+    menu_icon = "cart"  # change as required
     menu_order = 200  # will put in 3rd place (000 being 1st, 100 2nd)
     items = (
         CustomerSnippetViewSet,
@@ -65,17 +70,17 @@ class CategorySnippetViewSet(SnippetViewSet):
     model = Category
     ordering = ("name",)
     search_fields = ("name",)
-    icon = "tag"
+    icon = "layer-group"
     inspect_view_enabled = True
     base_url_path = "shop/categories"
     list_filter = ('parent',)
-    list_display = ('name', 'description', 'slug', 'parent')
+    list_display = ('__list_str__', 'description', 'slug', 'parent')
     list_export = ('name', 'description', 'slug', 'parent', 'image')
 
 class ProductSnippetViewSet(SnippetViewSet):
     model = Product
     ordering = ("name",)
-    icon = "list-ul"
+    icon = "pick"
     inspect_view_enabled = True
     list_display = ('name','image','category', 'price', 'live')
     list_filter = ('category', 'brand', 'live')
@@ -84,6 +89,7 @@ class ProductSnippetViewSet(SnippetViewSet):
     
 class BrandSnippetViewSet(SnippetViewSet):    
     model = Brand
+    icon = "wagtail-icon"
     ordering = ("name",)
     search_fields = ("name",)
     list_display = ('image','name','slug')
@@ -93,7 +99,7 @@ class BrandSnippetViewSet(SnippetViewSet):
 class ShopMenuGroup(SnippetViewSetGroup):
     menu_label = "Shop"
     base_url_path = "shop"
-    menu_icon = "folder"  # change as required
+    menu_icon = "store"  # change as required
     menu_order = 200  # will put in 3rd place (000 being 1st, 100 2nd)
     items = (
         CategorySnippetViewSet,
@@ -136,7 +142,11 @@ register_snippet(AttributeMenuGroup)
 
 
 from wagtail import hooks
-from .views import user_chooser_viewset,attribute_value_chooser_viewset, attribute_chooser_viewset, attribute_group_chooser_viewset
+from .views import user_chooser_viewset,attribute_value_chooser_viewset, attribute_chooser_viewset, attribute_group_chooser_viewset, category_chooser_viewset, address_chooser_viewset
+
+@hooks.register("register_icons")
+def register_icons(icons):
+    return icons + ['mysite/store.svg', 'mysite/cart.svg', 'mysite/layer-group.svg', 'mysite/dollar-sign.svg', 'mysite/orders.svg']
 
 @hooks.register('register_admin_viewset')
 def register_user_chooser_viewset():
@@ -153,6 +163,16 @@ def register_attribute_chooser_viewset():
 @hooks.register('register_admin_viewset')
 def register_attribute_group_chooser_viewset():
     return attribute_group_chooser_viewset
+
+@hooks.register('register_admin_viewset')
+def register_category_chooser_viewset():
+    return category_chooser_viewset
+
+@hooks.register('register_admin_viewset')
+def register_address_chooser_viewset():
+    return address_chooser_viewset
+
+
 
 
 @hooks.register('construct_snippet_action_menu')

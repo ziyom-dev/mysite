@@ -1,8 +1,27 @@
 from ..models import *
+
 from rest_framework import serializers
 from rest_framework.fields import Field
 from Customer.models import User, Address
 from django.db.models import Avg
+from django.utils import timezone
+
+
+
+
+class CustomDateTimeField(serializers.DateTimeField):
+    def to_representation(self, value):
+        value = timezone.localtime(value)
+        return {
+            'date': value.strftime('%d-%m-%Y'),
+            'time': value.strftime('%H:%M')
+        }
+
+class OtpSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Otp
+        fields = '__all__'
+        
 
 class AttributeValueSerializer(serializers.ModelSerializer):
     class Meta:
@@ -119,6 +138,17 @@ class BrandSerializer(serializers.ModelSerializer):
             representation['categories'] = categories_serializer.data
 
         return representation
+    
+        
+class ProductBrandSerializer(serializers.ModelSerializer):
+    image = ImageSerializedField()
+    
+    class Meta:
+        model = Brand
+        fields = "__all__"
+        extra_kwargs = {
+            'url': {'lookup_field': 'slug'}
+        }
         
 class ParentCategorySerializer(serializers.ModelSerializer):
     class Meta:
@@ -145,9 +175,10 @@ class ProductImageSerializer(serializers.ModelSerializer):
         
 class ProductSerializer(serializers.ModelSerializer):
     image = ImageSerializedField()
-    gallery = ProductImageSerializer(many=True, source='product_images')
+    gallery = ProductImageSerializer(many=True)
+    parent_category = CategorySerializer()
     category = CategorySerializer()
-    brand = BrandSerializer()
+    brand = ProductBrandSerializer()
     product_attrs = ProductAttributeSerializer(many=True, read_only=True)
     review_count = serializers.SerializerMethodField()
     product_rate = serializers.SerializerMethodField()
@@ -171,7 +202,7 @@ class ProductSerializer(serializers.ModelSerializer):
             representation.pop('gallery', None)
             representation.pop('sku', None)
             representation.pop('brand', None)
-            representation.pop('product_attrs', None)
+            representation.pop('productattrs', None)
             representation.pop('description', None)
             representation.pop('short_description', None)
         return representation
@@ -190,7 +221,11 @@ class FavoriteSerializer(serializers.ModelSerializer):
         model = UserFavoriteProduct
         fields = ['id', 'sort_order', 'user', 'product',]
         
+class AddressSerializer(serializers.ModelSerializer):
 
+    class Meta:
+        model = Address
+        exclude = ['user']
         
 class OrderItemSerializer(serializers.ModelSerializer):
     product = ProductSerializer()
@@ -200,18 +235,22 @@ class OrderItemSerializer(serializers.ModelSerializer):
 
 class OrderSerializer(serializers.ModelSerializer):
     items = OrderItemSerializer(many=True, read_only=True)
-
+    created_at = CustomDateTimeField(required=False)
+    updated_at = CustomDateTimeField(required=False)
+    delivery_address = AddressSerializer(required=False)
+    
+    def to_representation(self, instance):
+        representation = super(OrderSerializer, self).to_representation(instance)
+        if 'list' in self.context.get('view').action:
+            representation.pop('items', None)
+        return representation
+    
     class Meta:
         model = Order
-        fields = ['id', 'user', 'created_at', 'updated_at', 'total_price', 'items']
+        fields = ['id', 'user','user_name','user_phone','status', 'created_at', 'updated_at', 'total_price', 'items', 'delivery_type','delivery_address', 'payment_type', 'comment',]
         
 class CurrencySerializer(serializers.ModelSerializer):
     class Meta:
         model = Currency
         fields = "__all__"
         
-class AddressSerializer(serializers.ModelSerializer):
-
-    class Meta:
-        model = Address
-        exclude = ['user']

@@ -1,11 +1,13 @@
 # ecommerce/resources.py
 from import_export import resources, fields
-from import_export.widgets import ForeignKeyWidget, Widget
+from import_export.widgets import ForeignKeyWidget, Widget, BooleanWidget
 from .models import Product, Category, Brand
 import requests
 from django.core.files.base import ContentFile
 from wagtail.images.models import Image as WagtailImage
 import hashlib
+
+from mysite.settings.base import WAGTAILADMIN_BASE_URL
 
 
 class ImageWidget(ForeignKeyWidget):
@@ -40,7 +42,7 @@ class ImageWidget(ForeignKeyWidget):
         return None
 
     def render(self, value, obj=None):
-        return value.file.name if value else ""
+        return WAGTAILADMIN_BASE_URL+value.file.url if value else ""
 
 
 class CategoryWidget(Widget):
@@ -75,6 +77,22 @@ class ProductResource(resources.ModelResource):
         widget=ImageWidget()
     )
     
+    views = fields.Field(
+        column_name='',
+        attribute='',
+        readonly=True
+    )
+    purchases = fields.Field(
+        column_name='',
+        attribute='',
+        readonly=True
+    )
+    
+    delete = fields.Field(widget=BooleanWidget())
+
+    def for_delete(self, row, instance):
+        return self.fields['delete'].clean(row)
+    
     def before_import_row(self, row, **kwargs):
         brand_name = row.get("brand")  # Используйте метод .get() словаря
         if brand_name:  # Проверяем, что brand_name не None и не пустая строка
@@ -86,4 +104,4 @@ class ProductResource(resources.ModelResource):
         skip_unchanged = True
         report_skipped = False
         import_id_fields = ('id',)
-        exclude = ()
+        exclude = ('category_root_level', 'parent_category')

@@ -12,6 +12,9 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 import os
+from datetime import timedelta
+
+
 
 
 PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -48,6 +51,7 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt",
     "rest_framework",
     "django_filters",
+    "mptt",
     # "debug_toolbar",
 
     
@@ -127,7 +131,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = "en-us"
 
-TIME_ZONE = "UTC"
+TIME_ZONE = "Asia/Tashkent"
 
 USE_I18N = True
 
@@ -175,8 +179,8 @@ WAGTAILIMAGES_EXTENSIONS = ["gif", "jpg", "jpeg", "png", "webp", "svg"]
 
 # Base URL to use when referring to full URLs within the Wagtail admin backend -
 # e.g. in notification emails. Don't include '/admin' or a trailing slash
-WAGTAILADMIN_BASE_URL = "http://example.com"
-FRONTEND_URL = 'https://itpapa.uz/'
+WAGTAILADMIN_BASE_URL = "http://192.168.0.100:8000"
+FRONTEND_URL = "https://itpapa.uz/"
 
 AUTH_USER_MODEL = 'Customer.User'
 
@@ -193,13 +197,23 @@ REST_FRAMEWORK = {
     ],
 }
 # temp
-SECRET_KEY = "django-insecure-zlu(uqd1!8hv$#wk)nyy(^0cwt(4pyuqujn+rt5*+2=cik0vo)"
-from datetime import timedelta
+SECURE_HSTS_INCLUDE_SUBDOMAINS = False
+SECURE_HSTS_PRELOAD = False
+SECURE_HSTS_SECONDS = 31536000
+SECURE_SSL_REDIRECT = False
+SESSION_COOKIE_SECURE = False
+CSRF_COOKIE_SECURE = False
+
+
+SECRET_KEY = "bjo+f&5wp8&6x6%duzs+^o9$fbf3yrc^=(lw^-oi0*tp#r#)n9"
+
+TELEGRAM_BOT_TOKEN = "7056099882:AAEKKwskPJk5NZ4pcQ2a20Xh2fYZKc0YSP0"
+TELEGRAM_CHAT_ID = "-4157512195"
 
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=5),
-    'REFRESH_TOKEN_LIFETIME': timedelta(minutes=10),
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=10),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=30),
     'ROTATE_REFRESH_TOKENS': False,
     'BLACKLIST_AFTER_ROTATION': True,
     'ALGORITHM': 'HS256',

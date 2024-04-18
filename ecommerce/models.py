@@ -10,15 +10,20 @@ from wagtail.models import Orderable, ClusterableModel, DraftStateMixin, Revisio
 from modelcluster.models import ParentalKey
 from autoslug import AutoSlugField
 from django.db import transaction
-from Customer.models import User
-from .widgets import UserChooserWidget, AttributeValueChooserWidget, AttributeChooserWidget, AttributeGroupChooserWidget
+from Customer.models import User, Address
+from .widgets import UserChooserWidget, AttributeValueChooserWidget, AttributeChooserWidget, AttributeGroupChooserWidget,CategoryChooserWidget,AddressChooserWidget
 from wagtail.search import index
+from mptt.models import MPTTModel, TreeForeignKey
+from django.utils.html import format_html
+from phonenumber_field.modelfields import PhoneNumberField
+
+
         
-class Category(models.Model):
+class Category(MPTTModel):
     name = models.CharField(max_length=100)
     description = RichTextField(blank=True)
     slug = AutoSlugField(populate_from='name', editable=True, unique=True, blank=True)
-    parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='children')
+    parent = TreeForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='children', limit_choices_to={'level': 0})
     image = models.ForeignKey(
         "wagtailimages.Image",
         null=True,
@@ -32,12 +37,19 @@ class Category(models.Model):
         if self.parent and self.parent.id == self.id:
             raise ValidationError("Категория не может быть родителем для самой себя.")
 
+    def __list_str__(self):
+        return format_html("<span style='padding-left:{}px'>{}</span>", self.level * 20, self.name)
+    
     def __str__(self):
         return self.name
-
+    
+    class MPTTMeta:
+        order_insertion_by = ['name']
+    
     class Meta:
-        verbose_name_plural = "Categories"
-           
+        verbose_name = _("Category")
+        verbose_name_plural = _("Categories")
+              
 class Brand(models.Model):
     name = models.CharField(max_length=255)
     slug = AutoSlugField(populate_from='name', editable=True, unique=True, blank=True)
@@ -49,8 +61,8 @@ class Brand(models.Model):
         return f"{self.name}"
     
     class Meta:
-        verbose_name = "Brand"
-        verbose_name_plural = "Brands"
+        verbose_name = _("Brand")
+        verbose_name_plural = _("Brands")
 
 class AttributeGroup(ClusterableModel):
     name = models.CharField(max_length=255)
@@ -59,13 +71,12 @@ class AttributeGroup(ClusterableModel):
         FieldPanel('name'),
         InlinePanel("attributes", label="Attributes"),
     ]
-    
-    class Meta:
-        verbose_name = "Attribute Group"
-        verbose_name_plural = "Attribute Groups"
-
     def __str__(self):
         return self.name
+    
+    class Meta:
+        verbose_name = _("Attribute Group")
+        verbose_name_plural = _("Attribute Groups")
 
 class Attribute(Orderable, ClusterableModel):
     name = models.CharField(max_length=255)
@@ -77,12 +88,12 @@ class Attribute(Orderable, ClusterableModel):
         InlinePanel("values", label="Values"),
     ]
     
-    class Meta:
-        verbose_name = "Attribute"
-        verbose_name_plural = "Attributes"
-
     def __str__(self):
         return self.name
+    
+    class Meta:
+        verbose_name = _("Attribute")
+        verbose_name_plural = _("Attributes")
 
 class AttributeValue(Orderable):
     value = models.CharField(max_length=255)
@@ -93,13 +104,13 @@ class AttributeValue(Orderable):
         FieldPanel('value'),
     ]
     
-    class Meta:
-        verbose_name = "Attribute value"
-        verbose_name_plural = "Attribute values"
-
     def __str__(self):
         return self.value
     
+    class Meta:
+        verbose_name = _("Attribute value")
+        verbose_name_plural = _("Attribute values")
+
 class Availability(models.TextChoices):
     OUTOFSTOCK = 'OutOfStock', 'Нет в наличии'
     INSTOCK = 'InStock', 'Есть в наличии'
@@ -111,7 +122,8 @@ class Product(index.Indexed, DraftStateMixin, RevisionMixin, ClusterableModel):
     sku = models.CharField(blank=True, null=True, max_length=255)
     price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     sale_price = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
-    category = models.ForeignKey(Category, on_delete=models.PROTECT)
+    parent_category = models.ForeignKey(Category, on_delete=models.PROTECT, related_name='parent_category')
+    category = models.ForeignKey(Category, on_delete=models.PROTECT, related_name='category')
     brand = models.ForeignKey(Brand, on_delete=models.SET_NULL, null=True)
     availability = models.CharField(max_length=20, choices=Availability.choices, default=Availability.SOON)
     description = RichTextField(blank=True)
@@ -127,13 +139,18 @@ class Product(index.Indexed, DraftStateMixin, RevisionMixin, ClusterableModel):
     views = models.DecimalField(max_digits=10, decimal_places=0, default=0)
     purchases = models.DecimalField(max_digits=10, decimal_places=0, default=0)
     site_id = models.DecimalField(max_digits=10, decimal_places=0, blank=True, null=True)
+    
+    category_root_level = models.IntegerField(default=0)
     # Main
     main_panels = [
         FieldPanel("name"),
         FieldPanel("sku"),
         FieldPanel("price"),
         FieldPanel("sale_price"),
-        FieldPanel("category"),
+        FieldRowPanel([
+            FieldPanel("parent_category", widget=CategoryChooserWidget(linked_fields={'level': '#id_category_root_level'})),
+            FieldPanel("category", widget=CategoryChooserWidget(linked_fields={'parent': '#id_parent_category'})),
+        ]),
         FieldPanel("brand"),
     ]
     
@@ -151,7 +168,7 @@ class Product(index.Indexed, DraftStateMixin, RevisionMixin, ClusterableModel):
     # Gellery
     gallery_panels = [
         FieldPanel('image'),
-        InlinePanel('product_images', label='Галерея')
+        InlinePanel('gallery', label='Галерея')
     ]
     
     # Reviews
@@ -169,18 +186,21 @@ class Product(index.Indexed, DraftStateMixin, RevisionMixin, ClusterableModel):
     settings_panels = [
         FieldPanel("slug"),
         FieldPanel("availability"),
+        FieldPanel("category_root_level", attrs = {
+            'hidden': 'true'
+        }),
     ]
     
     # Handler
     edit_handler = TabbedInterface(
         [
-            ObjectList(main_panels, heading='Главные'),
-            ObjectList(content_panels, heading='Контент'),
-            ObjectList(attributes_panels, heading='Атрибуты'),
-            ObjectList(gallery_panels, heading='Изображения'),
-            ObjectList(reviews_panels, heading='Отзывы'),
-            ObjectList(counters_panels, heading='Счётчики'),
-            ObjectList(settings_panels, heading='Настройки'),
+            ObjectList(main_panels, heading='Main'),
+            ObjectList(content_panels, heading='Content'),
+            ObjectList(attributes_panels, heading='Attributes'),
+            ObjectList(gallery_panels, heading='Gallery'),
+            ObjectList(reviews_panels, heading='Reviews'),
+            ObjectList(counters_panels, heading='Counters'),
+            ObjectList(settings_panels, heading='Settings'),
         ]
     )
     
@@ -198,11 +218,11 @@ class Product(index.Indexed, DraftStateMixin, RevisionMixin, ClusterableModel):
     
     
     class Meta:
-        verbose_name = "Product"
-        verbose_name_plural = "Products"
+        verbose_name = _("Product")
+        verbose_name_plural = _("Products")
         
 class ProductImage(Orderable):
-    product = ParentalKey(Product, on_delete=models.CASCADE, related_name='product_images')
+    product = ParentalKey(Product, on_delete=models.CASCADE, related_name='gallery')
     image = models.ForeignKey(
         'wagtailimages.Image', on_delete=models.CASCADE, related_name='+'
     )
@@ -241,8 +261,7 @@ class ProductAttributeAttrs(Orderable):
             ]
         )
     ]
-    
-     
+ 
 class UserFavoriteProduct(Orderable):
     user = ParentalKey(User, on_delete=models.CASCADE, related_name='favorite_products')
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='favorited_by')
@@ -270,11 +289,14 @@ class PaymentType(models.TextChoices):
 
 class Order(ClusterableModel):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='orders')
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    user_name = models.CharField(max_length=255, null=True)
+    user_phone = PhoneNumberField(region="UZ", null=True)
+    created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True, null=True, blank=True)
     total_price = models.DecimalField(max_digits=10, decimal_places=0, default=0)
     status = models.CharField(max_length=20, choices=OrderStatus.choices, default=OrderStatus.PENDING)
     delivery_type = models.CharField(max_length=20, choices=OrderDeliveryType.choices, default=OrderDeliveryType.DELIVERY)
+    delivery_address = models.ForeignKey(Address, on_delete=models.SET_NULL, blank=True, null=True)
     payment_type = models.CharField(max_length=20, choices=PaymentType.choices, default=PaymentType.CASH)
     comment = models.TextField(blank=True)
 
@@ -287,6 +309,9 @@ class Order(ClusterableModel):
 
     main_panels = [
         FieldPanel("user", widget=UserChooserWidget),
+        FieldPanel("user_name"),
+        FieldPanel("user_phone"),
+        FieldPanel('delivery_address', widget=AddressChooserWidget(linked_fields={'user': '#id_user'})),
         InlinePanel("items", label="Order Items"),
         FieldPanel("total_price", read_only=True),
         FieldPanel("status"),
@@ -305,8 +330,8 @@ class Order(ClusterableModel):
         return f"Order #{self.id} by {self.user.username}"
 
     class Meta:
-        verbose_name_plural = "Orders"
-        verbose_name = "Order"
+        verbose_name = _("Order")
+        verbose_name_plural = _("Orders")
 
 class OrderItem(Orderable):
     order = ParentalKey(Order, on_delete=models.CASCADE, related_name='items')
@@ -352,8 +377,8 @@ class OrderItem(Orderable):
         return f"{self.quantity} x {self.product.name} = {self.total_price}"
 
     class Meta:
-        verbose_name = "Order Item"
-        verbose_name_plural = "Order Items"
+        verbose_name = _("Order Item")
+        verbose_name_plural = _("Order Items")
               
 class Currency(models.Model):
     code = models.CharField(max_length=3, unique=True)  # Код валюты (например, "USD" для доллара)
@@ -362,6 +387,10 @@ class Currency(models.Model):
     exchange_rate = models.DecimalField(max_digits=10, decimal_places=4)  # Курс обмена к базовой валюте
     # is_base_currency = models.BooleanField(default=False)  # Является ли валюта базовой
     
+    class Meta:
+        verbose_name = _("Currency")
+        verbose_name_plural = _("Currencys")
+        
     def __str__(self):
         return self.code  # Вернем код валюты как строковое представление
 
@@ -391,8 +420,14 @@ class Reviews(models.Model):
     )
     
     class Meta:
-        verbose_name_plural = "Reviews"
-        verbose_name = "Review"
+        verbose_name = _("Review")
+        verbose_name_plural = _("Reviews")
 
     def __str__(self):
         return f"Review by {self.user.username} on {self.product.name}"
+
+class Otp(models.Model):
+    phone_number = PhoneNumberField(region="UZ", unique=True, primary_key=True)
+    otp = models.IntegerField(null=True)
+    time = models.DateTimeField(auto_now=True)
+    attempts = models.IntegerField(default=3)

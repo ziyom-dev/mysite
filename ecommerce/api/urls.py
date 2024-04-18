@@ -10,4 +10,3 @@ router.register(r'currency', CurrencyViewSet)
 router.register(r'user/favorites', FavoriteProductsViewSet, basename='user-favorites')
 router.register(r'user/orders', OrderViewSet, basename='user-orders')
 router.register(r'user/address', AddressViewSet, basename='user-address')
-

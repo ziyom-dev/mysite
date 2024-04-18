@@ -19,9 +19,11 @@ class User(AbstractUser, ClusterableModel):
     ]
     
     main_panels = [
+        FieldPanel("username"),
         FieldPanel("phone_number"),
         FieldPanel("first_name"),
         FieldPanel("last_name"),
+        FieldPanel("date_joined", read_only=True),
     ]
     
     edit_handler = TabbedInterface(
@@ -61,7 +63,6 @@ class User(AbstractUser, ClusterableModel):
         
 class Address(Orderable):
     user = ParentalKey(User, on_delete=models.CASCADE, related_name='user_adress')
-    
     title = models.CharField(max_length=225)
     link = models.URLField(blank=True, null=True)
     name = models.CharField(max_length=225, blank=True, null=True)
@@ -87,3 +88,6 @@ class Address(Orderable):
             ]
         )
     ]
+    
+    def __str__(self):
+        return self.title

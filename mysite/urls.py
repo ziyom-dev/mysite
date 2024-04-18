@@ -1,5 +1,5 @@
 from django.conf import settings
-from django.urls import include, path
+from django.urls import include, path, reverse_lazy
 from django.contrib import admin
 
 from wagtail.admin import urls as wagtailadmin_urls
@@ -10,10 +10,7 @@ from ecommerce.api.urls import router as ecommerce_router
 from ecommerce.api.views import (
     CurrentUserView,
     ProductReviewsView,
-)
-from ecommerce.api.otp_views import (
-    OTPStorageView,
-    AuthView,
+    OtpAuth
 )
 
 from rest_framework_simplejwt.views import (
@@ -22,6 +19,7 @@ from rest_framework_simplejwt.views import (
     TokenVerifyView
 )
 # import debug_toolbar
+from django.views.generic.base import RedirectView
 
 
 urlpatterns = [
@@ -36,9 +34,7 @@ urlpatterns = [
     
     # user
     path('api/user/', CurrentUserView.as_view(), name='current-user'),
-    path('api/user/auth/', AuthView.as_view(), name='user-auth'),
-    path('api/otp-storage/', OTPStorageView.as_view(), name='otp_storage'),
-    
+    path('api/user/auth/', OtpAuth.as_view(), name='otp'),
     # Product
     path('api/products/<slug:product_slug>/reviews/', ProductReviewsView.as_view(), name='product-reviews'),
 
@@ -47,7 +43,7 @@ urlpatterns = [
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('api/token/verify/', TokenVerifyView.as_view(), name='token_verify'),
     
-    
+    path('', RedirectView.as_view(url=reverse_lazy('wagtailadmin_home')), name='home_redirect'),
     # path('__debug__/', include(debug_toolbar.urls)),
 ]
 

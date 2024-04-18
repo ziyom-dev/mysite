@@ -1,6 +1,6 @@
 # views.py
 
-from .serializers import UserSerializer, BrandSerializer, CategorySerializer, ProductSerializer, FavoriteSerializer, OrderSerializer, CurrencySerializer, ReviewsSerializer, CreateReviewSerializer, AddressSerializer
+from .serializers import UserSerializer, BrandSerializer, CategorySerializer, ProductSerializer, FavoriteSerializer, OrderSerializer, CurrencySerializer, ReviewsSerializer, CreateReviewSerializer, AddressSerializer,OtpSerializer
 from ..models import *
 from Customer.models import Address
 from .pagination import *
@@ -14,12 +14,80 @@ from django.db.models import Case, When, Q, F, FloatField
 
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
+from rest_fuzzysearch import search, sort
 
 from django.shortcuts import get_object_or_404
 
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from django.views.decorators.vary import vary_on_headers
+from django.conf import settings
+from django.urls import reverse
+
+# otp_views.py
+
+
+from rest_framework_simplejwt.tokens import RefreshToken
+from phonenumber_field.validators import validate_international_phonenumber
+
+
+from .otp import send_otp, verify_otp
+from .utils import send_telegram_message
+
+
+class OtpAuth(views.APIView):
+    def get(self, request):
+        otps = Otp.objects.all()
+        serializer = OtpSerializer(otps, many=True)
+        return Response(serializer.data)
+    
+    def post(self, request):
+        phone_number = request.data.get("phone_number")
+
+        # Проверка на наличие номера телефона
+        if not phone_number:
+            return Response({"error": "Phone number is required."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Валидация номера телефона
+        try:
+            validate_international_phonenumber(phone_number)
+        except ValidationError:
+            return Response({"error": "Invalid phone number format."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        result = send_otp(phone_number)
+        if result["success"]:
+            return Response({"message": f"OTP sent to {phone_number}."}, status=status.HTTP_200_OK)
+        else:
+            if "remaining_time" in result:
+                timer = int(result["remaining_time"])
+                return Response({"timer": timer}, status=status.HTTP_429_TOO_MANY_REQUESTS)
+            else:
+                return Response({"error": result["error"]}, status=status.HTTP_400_BAD_REQUEST)
+        
+
+    def put(self, request):
+        phone_number = request.data.get("phone_number")
+        otp = request.data.get("otp")
+
+        # Проверка на наличие номера телефона и OTP
+        if not phone_number or not otp:
+            return Response({"error": "Phone number and OTP are required."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Валидация номера телефона
+        try:
+            validate_international_phonenumber(phone_number)
+        except ValidationError:
+            return Response({"error": "Invalid phone number format."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Проверяем OTP и формируем ответ
+        result = verify_otp(phone_number, otp)
+        if result["success"]:
+            return Response({"message": result["message"], "refresh": result["refresh"], "access": result["access"], "created": result["created"]}, status=status.HTTP_200_OK)
+        else:
+            return Response({"error": result["message"]}, status=status.HTTP_400_BAD_REQUEST)
+        
+
+
     
 class CurrentUserView(RetrieveUpdateAPIView):
     permission_classes = [IsAuthenticated]
@@ -27,6 +95,7 @@ class CurrentUserView(RetrieveUpdateAPIView):
 
     def get_object(self):
         return self.request.user
+    
     
 class ShopBaseViewSet(viewsets.ReadOnlyModelViewSet):
     pagination_class = CustomPagination
@@ -91,15 +160,16 @@ class CategoryViewSet(ShopBaseViewSet):
 
         return queryset
     
-class ProductViewSet(ShopBaseViewSet):
-
+class ProductViewSet(viewsets.ReadOnlyModelViewSet, sort.SortedModelMixin, search.SearchableModelMixin):
     queryset = Product.objects.filter(live=True)
     serializer_class = ProductSerializer
-    search_fields = ['$name']
+    filter_backends = [DjangoFilterBackend, search.RankedFuzzySearchFilter, sort.OrderingFilter,AttributeFilterBackend]
+    search_fields = ['name']
     filterset_class = ProductFilter
     pagination_class = ProductsPagination
-    ordering_fields = ['name', 'price', 'views']
+    ordering_fields = ['rank', 'name', 'price', 'views']
     lookup_field = 'slug'
+    min_rank = 0.1
 
         # Применяем декораторы кеширования к методу list
     # @method_decorator(cache_page(60*60))  # Кеширует на 2 минуты
@@ -112,10 +182,7 @@ class ProductViewSet(ShopBaseViewSet):
     # @method_decorator(vary_on_headers("Authorization", "Accept-Language"))
     def retrieve(self, request, *args, **kwargs):
         response = super().retrieve(request, *args, **kwargs)
-        # Получаем объект продукта из базы данных
         product = self.get_object()
-        # Увеличиваем счетчик просмотров на 1
-        # Используем F() для предотвращения гонки условий при параллельных запросах
         Product.objects.filter(pk=product.pk).update(views=F('views') + 1)
         return response
 
@@ -127,13 +194,6 @@ class ProductViewSet(ShopBaseViewSet):
                 output_field=FloatField()
             )
         )
-        
-        attr_values = self.request.query_params.get('attr', None)
-        
-        if attr_values:
-            attr_values_list = attr_values.split(',')
-            attrs_query = Q(product_attrs__attrs__attribute_value__id__in=attr_values_list)
-            queryset = queryset.filter(attrs_query).distinct()
         
         brand_slug = self.request.query_params.get('brand_slug', None)
         if brand_slug is not None:
@@ -184,17 +244,46 @@ class OrderViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = OrderSerializer
     
+    def get_admin_edit_url(self, order_id):
+        return reverse('wagtailsnippets_ecommerce_order:edit', args=[order_id])
+
+
+    
     def get_queryset(self):
-        # Фильтруем список заказов, чтобы показать только заказы текущего пользователя
-        return Order.objects.filter(user=self.request.user)
+        """
+        Фильтрует список заказов, чтобы показать только заказы текущего пользователя,
+        и сортирует их по дате создания (новые сверху)
+        """
+        return Order.objects.filter(user=self.request.user).order_by('-created_at')
+
     
     def create(self, request, *args, **kwargs):
         data = request.data
         user = request.user
 
         with transaction.atomic():  # Используем транзакцию для обеспечения целостности данных
+            
+            if 'items' not in data or not data['items']:
+                return Response({'error': 'Нельзя создать заказ без продуктов'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            delivery_type = data.get('delivery_type', '')
+            if delivery_type not in dict(OrderDeliveryType.choices):
+                return Response({'error': 'Неверный тип доставки'}, status=status.HTTP_400_BAD_REQUEST)
+
+            payment_type = data.get('payment_type', '')
+            if payment_type not in dict(PaymentType.choices):
+                return Response({'error': 'Неверный тип оплаты'}, status=status.HTTP_400_BAD_REQUEST)
+
             # Создаем объект Order
-            order = Order.objects.create(user=user)
+            order = Order.objects.create(
+                user=user,
+                user_name=data.get('user_name', ''),  # Используем имя пользователя по умолчанию, если не указано другое
+                user_phone=data.get('user_phone', ''),  # Можете задать вашу логику для обработки телефона
+                delivery_address_id=data.get('delivery_address'),  # Передаем id адреса доставки
+                delivery_type=delivery_type,
+                payment_type=payment_type,
+                comment=data.get('comment', '')
+            )
 
             # Обработка элементов заказа, если они есть
             if 'items' in data:
@@ -205,10 +294,45 @@ class OrderViewSet(viewsets.ModelViewSet):
                         product_id=item_data['product_id'],
                         quantity=item_data['quantity']
                     )
+
+                items_info = []
+                for item_data in data['items']:
+                    product_id = item_data['product_id']
+                    quantity = item_data['quantity']
+                    product = Product.objects.get(pk=product_id)
+                    price_per_item = product.sale_price if product.sale_price else product.price
+                    total_per_item = price_per_item * quantity
+                    price_str = f"{price_per_item}$"
+                    product_url = settings.FRONTEND_URL + product.parent_category.slug + '/' + product.category.slug + '/' + product.slug
+                    if product.sale_price:
+                        price_str += " (%)"
+                    items_info.append(f"- <a href='{product_url}'>{product.name}</a> ({price_str} * {quantity} = {total_per_item}$)")
+                items_str = "\n".join(items_info)
+            
+            
+            
+            message = f'New order:\nID: {order.id}\nUser: {user.username}\nDelivery Type: {delivery_type}\nPayment Type: {payment_type}\nItems:\n'
+            message += items_str
+            
+            # Добавляем delivery_address в сообщение, если delivery_type равен 'delivery'
+            if delivery_type == OrderDeliveryType.DELIVERY:
+                delivery_address = order.delivery_address
+                if delivery_address:
+                    message += f"\nDelivery Address: <a href='{delivery_address.link}'>{delivery_address}</a>"
+                    
+            admin_edit_url = settings.WAGTAILADMIN_BASE_URL + self.get_admin_edit_url(order.id)
+            admin_edit_link = f"<a href='{admin_edit_url}'>Edit order</a>"
+                    
+            message += f"\n{admin_edit_link}"
+
+            send_telegram_message(message)
             
             # Вызываем метод save для обновления total_price
             order.save()
 
+        
+        
+        
         return Response(self.get_serializer(order).data, status=status.HTTP_201_CREATED)
     
     

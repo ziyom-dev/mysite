@@ -10,7 +10,7 @@ from wagtail.admin.ui.tables import TitleColumn
 from wagtail.admin.views.generic.chooser import (BaseChooseView,
                                                  ChooseResultsViewMixin,
                                                  ChooseViewMixin,
-                                                 CreationFormMixin)
+                                                 CreationFormMixin,)
 from wagtail.admin.viewsets.chooser import ChooserViewSet
 from wagtail.models import TranslatableMixin
 
@@ -253,8 +253,107 @@ class AttributeChooserViewSet(ChooserViewSet):
     choose_view_class = AttributeChooseView
     choose_results_view_class = AttributeChooseResultsView
     
+    
     choose_one_text = _("Choose an attribute")
     choose_another_text = _("Choose another attribute")
     edit_item_text = _("Edit this attribute")
+    
 
 attribute_chooser_viewset = AttributeChooserViewSet('attribute_chooser')
+
+
+# Category Chooser
+class CategorySearchFilterMixin(forms.Form):
+    q = forms.CharField(
+        label=_("Search term"),
+        widget=forms.TextInput(attrs={"placeholder": _("Search by Category name")}),
+        required=False,
+    )
+
+    def filter(self, objects):
+        search_query = self.cleaned_data.get("q")
+        if search_query:
+            objects = objects.filter(
+                Q(name__icontains=search_query)
+            )
+        return objects
+    
+class BaseCategoryChooseView(BaseChooseView):
+    def get_filter_form_class(self):
+        bases = [CategorySearchFilterMixin, BaseFilterForm]
+
+        i18n_enabled = getattr(settings, "WAGTAIL_I18N_ENABLED", False)
+        if i18n_enabled and issubclass(self.model_class, TranslatableMixin):
+            bases.insert(0, LocaleFilterMixin)
+
+        return type(
+            "FilterForm",
+            tuple(bases),
+            {},
+        )
+
+class CategoryChooseView(ChooseViewMixin, CreationFormMixin, BaseCategoryChooseView):
+    pass
+
+class CategoryChooseResultsView(ChooseResultsViewMixin, CreationFormMixin, BaseCategoryChooseView):
+    pass
+
+class CategoryChooserViewSet(ChooserViewSet):
+    model = "ecommerce.Category"
+    url_filter_parameters = ["parent","level"]
+    preserve_url_parameters = ["multiple", "parent", "level"]
+    
+    choose_view_class = CategoryChooseView
+    choose_results_view_class = CategoryChooseResultsView
+    
+
+category_chooser_viewset = CategoryChooserViewSet('category_chooser')
+
+# UserAdress
+
+
+class AddressSearchFilterMixin(forms.Form):
+    q = forms.CharField(
+        label=_("Search term"),
+        widget=forms.TextInput(attrs={"placeholder": _("Search by Address name")}),
+        required=False,
+    )
+
+    def filter(self, objects):
+        search_query = self.cleaned_data.get("q")
+        if search_query:
+            objects = objects.filter(
+                Q(title__icontains=search_query)
+            )
+        return objects
+    
+class BaseAddressChooseView(BaseChooseView):
+    def get_filter_form_class(self):
+        bases = [AddressSearchFilterMixin, BaseFilterForm]
+
+        i18n_enabled = getattr(settings, "WAGTAIL_I18N_ENABLED", False)
+        if i18n_enabled and issubclass(self.model_class, TranslatableMixin):
+            bases.insert(0, LocaleFilterMixin)
+
+        return type(
+            "FilterForm",
+            tuple(bases),
+            {},
+        )
+
+class AddressChooseView(ChooseViewMixin, CreationFormMixin, BaseAddressChooseView):
+    pass
+
+class AddressChooseResultsView(ChooseResultsViewMixin, CreationFormMixin, BaseAddressChooseView):
+    pass
+
+class AddressChooserViewSet(ChooserViewSet):
+    model = "Customer.Address"
+    url_filter_parameters = ["user"]
+    preserve_url_parameters = ["multiple", "user"]
+    
+    choose_view_class = AddressChooseView
+    choose_results_view_class = AddressChooseResultsView
+    
+
+address_chooser_viewset = AddressChooserViewSet('address_chooser')
