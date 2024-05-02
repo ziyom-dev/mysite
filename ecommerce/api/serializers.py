@@ -84,6 +84,8 @@ class ImageSerializedField(Field):
             # "width": value.width,
             # "height": value.height,
             "url": self.get_webp_url(value, 'fill-500x500'),
+            "card": self.get_webp_url(value, 'fill-280x280'),
+            "mini": self.get_webp_url(value, 'fill-180x180'),
             # "card": self.get_webp_url(value, 'fill-1000x1000'),
             # "mini-card": self.get_webp_url(value, 'fill-174x174'),
         }
@@ -112,7 +114,8 @@ class ReviewsSerializer(serializers.ModelSerializer):
         
 class BrandSerializer(serializers.ModelSerializer):
     image = ImageSerializedField()
-    
+    categories = serializers.SerializerMethodField()
+
     class Meta:
         model = Brand
         fields = "__all__"
@@ -120,24 +123,23 @@ class BrandSerializer(serializers.ModelSerializer):
             'url': {'lookup_field': 'slug'}
         }
         
-    def to_representation(self, instance):
-        representation = super().to_representation(instance)
-        request = self.context.get('request')
-        
-        # Проверяем, обращение идет к конкретному экземпляру, а не к списку
-        if request and request.parser_context.get('kwargs').get('slug'):
-            # Агрегируем категории продуктов, которые принадлежат данному бренду
-            # Предполагается, что у вас есть обратная связь от Product к Brand через поле brand
-            # и от Product к Category через поле category
-            categories = Category.objects.filter(
-                product__brand=instance
-            ).distinct()  # Используем distinct(), чтобы избежать дубликатов
+    def get_categories(self, brand):
+        # Получаем все продукты для данного бренда
+        products = Product.objects.filter(brand=brand)
 
-            # Сериализуем категории
-            categories_serializer = CategorySerializer(categories, many=True)
-            representation['categories'] = categories_serializer.data
+        # Инициализируем список категорий
+        categories = []
 
-        return representation
+        # Для каждого продукта получаем его категории и добавляем их в список
+        for product in products:
+            # Добавляем категорию category
+            if product.category not in categories:
+                categories.append(product.category)
+
+
+        # Сериализуем категории
+        categories_serializer = CategorySerializer(categories, many=True)
+        return categories_serializer.data
     
         
 class ProductBrandSerializer(serializers.ModelSerializer):

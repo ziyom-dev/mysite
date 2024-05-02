@@ -1,17 +1,17 @@
 from .base import *
 
-DEBUG = True
-ALLOWED_HOSTS = ['.itpapa.uz', 'localhost', '127.0.0.1', '192.168.0.100']
-# CACHES = {
-#     'default': {
-#         'BACKEND': 'django_redis.cache.RedisCache',
-#         'LOCATION': 'redis://127.0.0.1:6379/1',
-#         'OPTIONS': {
-#             'CLIENT_CLASS': 'django_redis.client.DefaultClient',
-#             'KEY_PREFIX': 'mysite',  # Префикс для всех ключей кеша
-#         }
-#     }
-# }
+DEBUG = False
+ALLOWED_HOSTS = ['.itpapa.uz', 'localhost', '127.0.0.1']
+CACHES = {
+    'default': {
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': 'redis://127.0.0.1:6379/1',
+        'OPTIONS': {
+            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+            'KEY_PREFIX': 'mysite',  # Префикс для всех ключей кеша
+        }
+    }
+}
 
 DATABASES = {
     'default': {

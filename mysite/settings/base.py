@@ -179,8 +179,8 @@ WAGTAILIMAGES_EXTENSIONS = ["gif", "jpg", "jpeg", "png", "webp", "svg"]
 
 # Base URL to use when referring to full URLs within the Wagtail admin backend -
 # e.g. in notification emails. Don't include '/admin' or a trailing slash
-WAGTAILADMIN_BASE_URL = "http://192.168.0.100:8000"
-FRONTEND_URL = "https://itpapa.uz/"
+WAGTAILADMIN_BASE_URL = "https://admin.itpapa.uz"
+FRONTEND_URL = "https://itpapa.uz"
 
 AUTH_USER_MODEL = 'Customer.User'
 
@@ -195,7 +195,10 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.BasicAuthentication',
         'rest_framework.authentication.SessionAuthentication',
     ],
+
+    "DEFAULT_RENDERER_CLASSES": ("rest_framework.renderers.JSONRenderer",),
 }
+
 # temp
 SECURE_HSTS_INCLUDE_SUBDOMAINS = False
 SECURE_HSTS_PRELOAD = False

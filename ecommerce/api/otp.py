@@ -1,7 +1,7 @@
 from ..models import Otp
 from django.utils import timezone
 from datetime import timedelta
-from .utils import send_telegram_message
+from .utils import send_telegram_message, send_otp_by_sms
 from rest_framework_simplejwt.tokens import RefreshToken
 from Customer.models import User
 import random
@@ -37,6 +37,7 @@ def send_otp(phone_number):
         
         # Здесь будет код для отправки OTP
         send_telegram_message(f'{phone_number}: {otp.otp}')
+        send_otp_by_sms(phone_number, otp.otp)
 
         return {"success": True}
     except Exception as e:

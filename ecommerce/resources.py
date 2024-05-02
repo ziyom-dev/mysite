@@ -45,25 +45,18 @@ class ImageWidget(ForeignKeyWidget):
         return WAGTAILADMIN_BASE_URL+value.file.url if value else ""
 
 
-class CategoryWidget(Widget):
-    def clean(self, value, row=None, *args, **kwargs):
-        if value:
-            parent_name, category_name = value.split(">")
-            parent, _ = Category.objects.get_or_create(name=parent_name, parent=None)
-            category, _ = Category.objects.get_or_create(name=category_name, parent=parent)
-            return category
-        return None
 
-    def render(self, value, obj=None):
-        if value:
-            return f"{value.parent.name}>{value.name}" if value.parent else value.name
-        return ""
 
 class ProductResource(resources.ModelResource):
+    parent_category = fields.Field(
+        column_name='parent_category',
+        attribute='parent_category',
+        widget=ForeignKeyWidget(Category, 'name')
+    )
     category = fields.Field(
         column_name='category',
         attribute='category',
-        widget=CategoryWidget()
+        widget=ForeignKeyWidget(Category, 'name')
     )
     brand = fields.Field(
         column_name='brand',
@@ -88,15 +81,24 @@ class ProductResource(resources.ModelResource):
         readonly=True
     )
     
-    delete = fields.Field(widget=BooleanWidget())
-
-    def for_delete(self, row, instance):
-        return self.fields['delete'].clean(row)
-    
     def before_import_row(self, row, **kwargs):
-        brand_name = row.get("brand")  # Используйте метод .get() словаря
+        parent_category_name = row.get("parent_category")  # Получаем имя родительской категории из импортируемых данных
+        if parent_category_name:  # Проверяем, что parent_category_name не None и не пустая строка
+            parent_category, _ = Category.objects.get_or_create(name=parent_category_name)
+            
+            # Ищем родительскую категорию в MPTT модели
+            if parent_category.pk:
+                parent_category = Category.objects.filter(pk=parent_category.pk).first()
+            
+            # Устанавливаем parent_category как родителя для category
+            category_name = row.get("category")  # Получаем имя категории из импортируемых данных
+            if category_name:  # Проверяем, что category_name не None и не пустая строка
+                category, _ = Category.objects.get_or_create(name=category_name, defaults={"name": category_name, "parent": parent_category})
+            
+        brand_name = row.get("brand")  # Получаем имя бренда из импортируемых данных
         if brand_name:  # Проверяем, что brand_name не None и не пустая строка
             Brand.objects.get_or_create(name=brand_name, defaults={"name": brand_name})
+
 
 
     class Meta:
@@ -104,4 +106,4 @@ class ProductResource(resources.ModelResource):
         skip_unchanged = True
         report_skipped = False
         import_id_fields = ('id',)
-        exclude = ('category_root_level', 'parent_category')
+        exclude = ('category_root_level')

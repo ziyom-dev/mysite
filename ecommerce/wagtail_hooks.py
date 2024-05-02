@@ -74,7 +74,7 @@ class CategorySnippetViewSet(SnippetViewSet):
     inspect_view_enabled = True
     base_url_path = "shop/categories"
     list_filter = ('parent',)
-    list_display = ('__list_str__', 'description', 'slug', 'parent')
+    list_display = ('__list_str__', 'slug', 'parent')
     list_export = ('name', 'description', 'slug', 'parent', 'image')
 
 class ProductSnippetViewSet(SnippetViewSet):

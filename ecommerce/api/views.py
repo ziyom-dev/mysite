@@ -168,18 +168,18 @@ class ProductViewSet(viewsets.ReadOnlyModelViewSet, sort.SortedModelMixin, searc
     filterset_class = ProductFilter
     pagination_class = ProductsPagination
     ordering_fields = ['rank', 'name', 'price', 'views']
+    ordering = ('-rank')
     lookup_field = 'slug'
-    min_rank = 0.1
+
 
         # Применяем декораторы кеширования к методу list
-    # @method_decorator(cache_page(60*60))  # Кеширует на 2 минуты
-    # @method_decorator(vary_on_headers("Authorization", "Accept-Language"))
+    @method_decorator(cache_page(300, key_prefix="product-view"))
     def list(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
 
     # Применяем декораторы кеширования к методу retrieve
-    # @method_decorator(cache_page(60*60))  # Кеширует на 5 минут
-    # @method_decorator(vary_on_headers("Authorization", "Accept-Language"))
+    @method_decorator(cache_page(60*60))  # Кеширует на 5 минут
+    @method_decorator(vary_on_headers("Authorization", "Accept-Language"))
     def retrieve(self, request, *args, **kwargs):
         response = super().retrieve(request, *args, **kwargs)
         product = self.get_object()
