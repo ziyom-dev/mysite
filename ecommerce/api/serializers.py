@@ -83,9 +83,9 @@ class ImageSerializedField(Field):
             # "alt": value.title,
             # "width": value.width,
             # "height": value.height,
-            "url": self.get_webp_url(value, 'fill-500x500'),
-            "card": self.get_webp_url(value, 'fill-280x280'),
-            "mini": self.get_webp_url(value, 'fill-180x180'),
+            "url": self.get_webp_url(value, 'max-500x500'),
+            "card": self.get_webp_url(value, 'max-280x280'),
+            "mini": self.get_webp_url(value, 'max-180x180'),
             # "card": self.get_webp_url(value, 'fill-1000x1000'),
             # "mini-card": self.get_webp_url(value, 'fill-174x174'),
         }
